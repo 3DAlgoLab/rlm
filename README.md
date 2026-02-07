@@ -36,6 +36,7 @@ This repository provides an extensible inference engine for using RLMs around st
 > This repository contains inference code for RLMs with support for various sandbox environments. Open-source contributions are welcome. This repository is maintained by the authors of the paper from the MIT OASYS lab.
 
 ## Quick Setup
+You can try out RLMs quickly by installing from PyPi:
 ```bash
 pip install rlms
 ```
@@ -54,7 +55,7 @@ print(rlm.completion("Print me the first 100 powers of two, each on a newline.")
 ```
 
 <details>
-<summary>Manual Setup</summary>
+<summary><b>Manual Setup</b></summary>
 
 Set up the dependencies with `uv` (or your virtual environment of choice):
 ```bash
