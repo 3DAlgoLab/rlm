@@ -149,7 +149,7 @@ rlm = RLM(
 ```
 
 To run the visualizer locally, we use Node.js and shadcn/ui:
-```
+```bash
 cd visualizer/
 npm run dev        # default localhost:3001
 ```

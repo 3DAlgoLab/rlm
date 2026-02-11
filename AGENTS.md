@@ -73,6 +73,21 @@ uv run pre-commit install
 - Update tests when changing functionality
 - For isolated environments, mock external services
 
+#### Running Single Tests
+```bash
+# Run specific test file
+uv run pytest tests/test_local_repl.py
+
+# Run specific test class
+uv run pytest tests/test_local_repl.py::TestLocalREPLBasic
+
+# Run specific test method
+uv run pytest tests/test_local_repl.py::TestLocalREPLBasic::test_simple_execution
+
+# Run tests with coverage
+uv run pytest --cov=rlm
+```
+
 ### Documentation
 - Keep concise and actionable
 - Update README when behavior changes
@@ -100,6 +115,7 @@ uv run pytest
 
 Ensure docs and tests are updated if necessary, and dead code is deleted. Strive for minimal, surgical diffs.
 
+
 ## Developing LM Clients
 
 LM client implementations live in `rlm/clients/`. All clients must inherit from `BaseLM`.
@@ -116,25 +132,6 @@ LM client implementations live in `rlm/clients/`. All clients must inherit from 
 - Track per-model usage (calls, input/output tokens)
 - Handle both string and message list prompts
 - Register client in `rlm/clients/__init__.py`
-
-### Example Structure
-```python
-from rlm.clients.base_lm import BaseLM
-from rlm.core.types import ModelUsageSummary, UsageSummary
-
-class MyClient(BaseLM):
-    def __init__(self, api_key: str, model_name: str, **kwargs):
-        super().__init__(model_name=model_name, **kwargs)
-        # Initialize your client
-        
-    def completion(self, prompt: str | list[dict[str, Any]], model: str | None = None) -> str:
-        # Handle both str and message list formats
-        # Track usage with _track_cost()
-        # Return response string
-        
-    def get_usage_summary(self) -> UsageSummary:
-        # Return aggregated usage across all calls
-```
 
 ### Configuration Guidelines
 - **Environment variables**: ONLY for API keys (document in README)
@@ -173,60 +170,9 @@ Environments must provide these globals to executed code:
 - `llm_query_batched(prompts, model=None)`: For batched sub-LM calls
 - `FINAL_VAR(variable_name)`: For returning final answers
 
-### Example Structure
-```python
-from rlm.environments.base_env import NonIsolatedEnv
-from rlm.core.types import REPLResult
-
-class MyEnvironment(NonIsolatedEnv):
-    def __init__(self, lm_handler_address: tuple[str, int] | None = None, 
-                 context_payload: dict | list | str | None = None, **kwargs):
-        super().__init__(**kwargs)
-        self.lm_handler_address = lm_handler_address
-        self.setup()
-        if context_payload:
-            self.load_context(context_payload)
-            
-    def setup(self):
-        # Initialize execution namespace
-        
-    def load_context(self, context_payload: dict | list | str):
-        # Make context available to executed code
-        
-    def execute_code(self, code: str) -> REPLResult:
-        # Execute code and return REPLResult
-        
-    def cleanup(self):
-        # Clean up resources
-```
-
-### Checklist
-- Guidelines here are followed
-- Environment works with basic RLM completion calls
-- `cleanup()` properly releases all resources
-- Sub-LM calls work via `llm_query()`
-
 ## Architecture: Environment ↔ LM Handler Communication
 
 Understanding how environments communicate with the LM Handler is essential for developing new environments.
-
-### Overview
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  Host Machine                                                       │
-│  ┌─────────────┐       Socket (TCP)        ┌──────────────────────┐ │
-│  │   RLM       │◄──────────────────────────►  LMHandler           │ │
-│  │  (main)     │                           │  (ThreadingTCPServer)│ │
-│  └─────────────┘                           └──────────────────────┘ │
-│        │                                            ▲               │
-│        ▼                                            │               │
-│  ┌─────────────┐       Socket (TCP)                 │               │
-│  │ LocalREPL   │────────────────────────────────────┘               │
-│  │ (exec code) │  llm_query() → send_lm_request()                   │
-│  └─────────────┘                                                    │
-└─────────────────────────────────────────────────────────────────────┘
-```
 
 ### Socket Protocol (Non-Isolated Environments)
 
@@ -257,29 +203,6 @@ def socket_send(sock: socket.socket, data: dict) -> None:
 ### HTTP Broker Pattern (Isolated Environments)
 
 Isolated environments (Modal, Prime) cannot directly connect to the host's socket server. They use an HTTP broker pattern:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Host Machine                                                               │
-│  ┌─────────┐    Socket    ┌────────────┐    HTTP Poll    ┌────────────────┐ │
-│  │   RLM   │◄────────────►│  LMHandler │◄────────────────│   ModalREPL    │ │
-│  └─────────┘              └────────────┘                 │  (poller)      │ │
-│                                                          └────────────────┘ │
-│                                                                  │          │
-│                                                          HTTP (tunnel)      │
-│                                                                  │          │
-└──────────────────────────────────────────────────────────────────┼──────────┘
-                                                                   │
-┌──────────────────────────────────────────────────────────────────┼──────────┐
-│  Cloud Sandbox (Modal/Prime)                                     ▼          │
-│  ┌─────────────┐     HTTP (localhost)     ┌─────────────────────────────┐   │
-│  │ Exec Script │◄────────────────────────►│   Broker Server (Flask)     │   │
-│  │ (exec code) │     /enqueue, etc.       │   - /enqueue (submit req)   │   │
-│  └─────────────┘                          │   - /pending (poll reqs)    │   │
-│                                           │   - /respond (return resp)  │   │
-│                                           └─────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
 
 **How It Works**:
 
@@ -317,4 +240,3 @@ When building a new isolated environment (e.g., for a new cloud provider):
 5. **Handle state** - Serialize/deserialize execution state between code blocks
 
 See `rlm/environments/modal_repl.py` as the canonical reference implementation.
-
