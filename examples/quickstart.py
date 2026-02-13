@@ -10,12 +10,14 @@ load_dotenv()
 logger = RLMLogger(log_dir="./logs")
 
 rlm = RLM(
-    backend="openai",  # or "portkey", etc.
+    backend="litellm",  # or "portkey", etc.
     backend_kwargs={
-        "model_name": "gpt-5-nano",
-        "api_key": os.getenv("OPENAI_API_KEY"),
+        "model_name": "lm_studio/qwen/qwen3-coder-next",
+        "api_key": os.getenv("LM_STUDIO_API_KEY"),
+        "api_base": os.getenv("LM_STUDIO_API_BASE"), 
+        "temperature": 0.5
     },
-    environment="docker",
+    environment="local",
     environment_kwargs={},
     max_depth=1,
     logger=logger,
